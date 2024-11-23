@@ -1,11 +1,8 @@
 # main.py
-import logging
+import logging, os, sqlite3, requests
 from dotenv import load_dotenv
 from md2tgmd import escape
-import os
-import sqlite3
 from datetime import datetime, timedelta
-import requests  # Для запросов к ChatAI API
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 
@@ -21,12 +18,6 @@ CHATAI_API_URL = "https://chatai.edro.su/ollama/api/generate"  # URL API ChatAI
 
 # База данных SQLite
 DB_NAME = "digestBot.db"
-
-# def escape_markdown_v2(text):
-#     special_chars = r"_[]()~`>#+|{}.!-"
-#     for char in special_chars:
-#         text = text.replace(char, f'\\{char}')
-#     return text
 
 def init_db():
     """Инициализация базы данных."""
@@ -71,7 +62,7 @@ async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor.execute("""
         SELECT message FROM messages
         WHERE timestamp > ?
-        and chat_id = ?
+        AND chat_id = ?
         ORDER BY timestamp
     """, (one_week_ago, update.effective_chat.id))
     messages = [row[0] for row in cursor.fetchall()]
@@ -82,20 +73,40 @@ async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Формируем запрос к ChatAI
-    payload = {"model":"gemma2:9b", "prompt": f"Создай из этих сообщений еженедельный дайджест, за {datetime.now() - timedelta(days=7)} - {datetime.now()}: {messages}", "stream": False}
+    start_date = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    prompt = f"Создай из этих сообщений еженедельный дайджест за период {start_date} - {end_date}:\n" + "\n".join(messages)
+    payload = {
+        "model": "gemma2:9b",
+        "prompt": prompt,
+        "stream": False
+    }
 
     try:
         await update.message.reply_text(f"Генерирую дайджест...")
-        response = requests.post(CHATAI_API_URL, json=payload, headers={'Authorization': f'Bearer {CHAT_API_TOKEN}'})
+        response = requests.post(
+            CHATAI_API_URL,
+            json=payload,
+            headers={'Authorization': f'Bearer {CHAT_API_TOKEN}'}
+        )
         response.raise_for_status()
-        data = response.json()["response"]
-
-        # Предполагаем, что в ответе есть ключ 'result' с дайджестом
+        data = response.json()
         
-        await update.message.reply_text(f"{escape(data)}", parse_mode="MarkdownV2")
+        if "response" not in data:
+            raise ValueError("Некорректный ответ от API: отсутствует ключ 'response'")
+        
+        digest = data["response"]
+        
+        # Разделяем длинные сообщения
+        for chunk in [digest[i:i+4000] for i in range(0, len(digest), 4000)]:
+            await update.message.reply_text(f"{escape(chunk)}", parse_mode="MarkdownV2")
     except requests.exceptions.RequestException as e:
         logging.error(f"Ошибка запроса к ChatAI: {e}")
         await update.message.reply_text("Ошибка при генерации дайджеста. Попробуйте позже.")
+    except Exception as e:
+        logging.error(f"Непредвиденная ошибка: {e}")
+        await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+
 
 def main():
     """Главная функция."""
