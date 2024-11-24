@@ -1,2 +1,4 @@
 .env
 digestBot.db
+backup
+__pycache__
