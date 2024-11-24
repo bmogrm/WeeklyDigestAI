@@ -17,7 +17,7 @@ CHAT_API_TOKEN = os.getenv('CHAT_API_TOKEN')
 CHATAI_API_URL = "https://chatai.edro.su/ollama/api/generate"  # URL API ChatAI
 MY_ID = int(os.getenv('MY_ID'))
 
-def main():
+def main() -> None:
     db.init_db()
     app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 

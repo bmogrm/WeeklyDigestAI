@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from telegram import Update
 from telegram.ext import ContextTypes
 
-async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Формирует дайджест за последнюю неделю с использованием ChatAI."""
 
     if update.effective_user.id != main.MY_ID:
@@ -19,7 +19,7 @@ async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
     cursor = conn.cursor()
     one_week_ago = datetime.now() - timedelta(days=7)
     cursor.execute("""
-        SELECT message FROM messages
+        SELECT message, timestamp FROM messages
         WHERE timestamp > ?
         AND chat_id = ?
         ORDER BY timestamp
