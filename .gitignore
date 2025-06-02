@@ -2,3 +2,5 @@
 digestBot.db
 backup
 __pycache__
+key
+key.pub

@@ -42,12 +42,15 @@ def get_completion(context, prompt, retry=0):
     )
     print(response.json())
     if response.status_code == 200:
-        return (response.json()["choices"][0]["message"]["content"], response.json()['usage']['total_cost'])
+        return (
+            response.json()["choices"][0]["message"]["content"],
+            response.json()["usage"]["total_cost"]
+        )
     else:
         if retry < 5:
             return get_completion(context, prompt, retry=retry + 1)
         else:
-            return response.json()
+            return (f"Ошибка: {response.status_code} — {response.json()}", None)
         
 def get_balance(retry=0):
     response = r.get("https://gptunnel.ru/v1/balance",                      
@@ -117,7 +120,9 @@ async def generate_digest(update: Update, context: ContextTypes.DEFAULT_TYPE):
             context=system_message,
             prompt=user_prompt
         )
-        
+        if cost is None:
+            await update.message.reply_text("Произошла ошибка при генерации дайджеста 202:\n")
+            return
         logging.info(f"Дайджест сгенерирован успешно. Стоимость: {cost}")
         
         # 5. Отправка результата пользователю
@@ -204,6 +209,10 @@ async def generate_digest_for_chat(chat_id):
             context=system_message,
             prompt=user_prompt
         )
+
+        if cost is None:
+            await app.bot.send_message("Произошла ошибка при генерации дайджеста 202:\n")
+            return
         
         logging.info(f"Дайджест сгенерирован успешно. Стоимость: {cost}")
         
