@@ -44,8 +44,9 @@ def init_db() -> None:
         """)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS schedules (
-            user_id INTEGER PRIMARY KEY,
-            chat_id INTEGER NOT NULL,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            chat_id INTEGER,
             frequency TEXT DEFAULT 'weekly', -- daily, every_tree_days, weekly
             next_run DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users (id)
@@ -53,15 +54,23 @@ def init_db() -> None:
         """)
 
 def set_schedule(user_id: int, chat_id: int, frequency: str) -> None:
-    """Устанавливает расписание для пользователя."""
     with get_connection() as conn:
-        conn.cursor().execute("""
-            INSERT INTO schedules (user_id, chat_id, frequency, next_run)
-            VALUES (?, ?, ?, datetime('now'))
-            ON CONFLICT(user_id) DO UPDATE SET
-                frequency = excluded.frequency,
-                next_run = datetime('now')
-        """, (user_id, chat_id, frequency))
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 1 FROM schedules WHERE chat_id = ?
+        """, (chat_id,))
+        
+        if cursor.fetchone():
+            cursor.execute("""
+                UPDATE schedules 
+                SET user_id = ?, frequency = ?, next_run = datetime('now')
+                WHERE chat_id = ?
+            """, (user_id, frequency, chat_id))
+        else:
+            cursor.execute("""
+                INSERT INTO schedules (user_id, chat_id, frequency, next_run)
+                VALUES (?, ?, ?, datetime('now'))
+            """, (user_id, chat_id, frequency))
 
 def get_schedule(user_id: int) -> Optional[tuple]:
     """Получает расписание пользователя."""
@@ -79,9 +88,9 @@ def update_next_run(user_id: int) -> None:
         conn.cursor().execute("""
             UPDATE schedules
             SET next_run = CASE frequency
-                WHEN 'daily' THEN datetime(next_run, '+1 day')
-                WHEN 'every_three_days' THEN datetime(next_run, '+3 day')
-                WHEN 'weekly' THEN datetime(next_run, '+7 day')
+                WHEN 'daily' THEN datetime('now', '+1 day')
+                WHEN 'every_three_days' THEN datetime('now', '+3 day')
+                WHEN 'weekly' THEN datetime('now', '+7 day')
             END
             WHERE user_id = ?
         """, (user_id,))
@@ -99,6 +108,13 @@ def add_chat(chat_id, titile) -> None:
             INSERT OR IGNORE INTO chats (id, chat_title)
             VALUES (?, ?)
         """, (chat_id, titile))
+
+def add_first_schedule(user_id, chat_id) -> None:
+    with get_connection() as conn:
+        conn.cursor().execute("""
+            INSERT OR IGNORE INTO schedules (user_id, chat_id, frequency, next_run)
+            VALUES (?, ?, 'weekly', datetime('now'))
+        """, (user_id, chat_id))
 
 async def save_message(chat_id, chat_title, user_id, 
                        user_first_name, user_last_name, 
@@ -132,4 +148,12 @@ async def collect_message(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     username = update.effective_user.username
 
     await save_message(chat_id, chat_title, user_id, user_first_name, user_last_name, username, message)
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT chat_id FROM schedules")
+        existing_chat_ids = [row[0] for row in cursor.fetchall()]
+        if chat_id not in existing_chat_ids:
+            add_first_schedule(user_id, chat_id)
+
     logging.info(f"Сохранено сообщение: {user_first_name, user_last_name} -- {message}")
