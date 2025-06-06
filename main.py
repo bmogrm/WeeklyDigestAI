@@ -56,7 +56,6 @@ async def process_tasks():
 
 async def post_init(application):
     """Функция, вызываемая после инициализации приложения."""
-    # Запуск обработчика задач в основном event loop
     application.create_task(process_tasks())
 
 def main() -> None:

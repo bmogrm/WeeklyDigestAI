@@ -4,7 +4,7 @@ import sqlite3
 import crypto
 from md2tgmd import escape
 from datetime import datetime, timedelta
-from telegram import Update, ReplyKeyboardMarkup, KeyboardButton
+from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, ReplyKeyboardRemove
 from telegram.ext import ContextTypes
 import asyncio
 
@@ -257,7 +257,10 @@ async def set_digest_frequency(update: Update, context: ContextTypes.DEFAULT_TYP
         return
 
     db.set_schedule(user_id, chat_id, frequency_map[frequency])
-    await update.message.reply_text(f"Частота дайджеста установлена: {frequency}.")
+    await update.message.reply_text(
+        f"Частота дайджеста установлена: {frequency}.", 
+        reply_markup=ReplyKeyboardRemove()
+    )
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if update.effective_chat.type == "private":
