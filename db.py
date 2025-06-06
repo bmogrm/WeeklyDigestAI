@@ -71,6 +71,7 @@ def set_schedule(user_id: int, chat_id: int, frequency: str) -> None:
                 INSERT INTO schedules (user_id, chat_id, frequency, next_run)
                 VALUES (?, ?, ?, datetime('now'))
             """, (user_id, chat_id, frequency))
+    update_next_run(chat_id)
 
 def get_schedule(user_id: int) -> Optional[tuple]:
     """Получает расписание пользователя."""
@@ -78,11 +79,11 @@ def get_schedule(user_id: int) -> Optional[tuple]:
         cursor = conn.cursor()
         cursor.execute("""
             SELECT frequency, next_run FROM schedules
-            WHERE user_id = ?
+            WHERE chat_id = ?
         """, (user_id,))
         return cursor.fetchone()
     
-def update_next_run(user_id: int) -> None:
+def update_next_run(chat_id: int) -> None:
     """Обновляет время следующего запуска для пользователя."""
     with get_connection() as conn:
         conn.cursor().execute("""
@@ -92,8 +93,8 @@ def update_next_run(user_id: int) -> None:
                 WHEN 'every_three_days' THEN datetime('now', '+3 day')
                 WHEN 'weekly' THEN datetime('now', '+7 day')
             END
-            WHERE user_id = ?
-        """, (user_id,))
+            WHERE chat_id = ?
+        """, (chat_id,))
 
 def add_user(user_id, first_name, last_name, username) -> None:
     with get_connection() as conn:
