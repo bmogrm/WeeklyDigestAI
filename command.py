@@ -178,6 +178,7 @@ async def generate_digest_for_chat(chat_id):
     if not encrypted_messages:
         # Отправляем сообщение в чат
         await app.bot.send_message(chat_id=chat_id, text="За последнюю неделю сообщений не найдено.")
+        db.update_next_run(chat_id)
         return
     
     # 2. Дешифровка сообщений
@@ -223,6 +224,8 @@ async def generate_digest_for_chat(chat_id):
                 text=chunk,
                 parse_mode="Markdown"
             )
+        # 6. Обновление следующей отправки
+        db.update_next_run(chat_id)
             
     except Exception as e:
         logging.error(f"Ошибка генерации дайджеста: {str(e)}")
